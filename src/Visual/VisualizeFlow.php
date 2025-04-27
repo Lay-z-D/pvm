@@ -58,12 +58,12 @@ class VisualizeFlow
       //   $ended = true;
       //   $this->createEndTransition($graph, $endVertex, $transition);
       // }
-	 
+
 	  // Changed commented part to original to avoid error mentioned in line 43
 	  if (empty($process->getOutTransitions($transition->getTo()))) {
                 $this->createEndTransition($graph, $endVertex, $transition);
       }
-	  
+
     }
 
     return $graph;
@@ -150,22 +150,28 @@ class VisualizeFlow
     }
 
     //$shape = $this->getNodeShape($options);
-	
+
 	switch ($node->getOption('type')) {  // original was "switch ($options->getType())"
 
             case 'gateway':
                 $shape = 'diamond';
 				$color = 'black';
                 break;
+            case 'diagram':
+              $shape = 'doubleoctagon';
+              $color = 'orange';
+              $style = 'bold';
+              break;
             case 'component':
                 $shape = 'component';
                 $color = 'orange';
                 break;
             default:
                 $shape = 'box';
+                $style = 'solid';
 				$color = 'black';
         }
-	
+
 	if(!$color) { $color = $node->getConfig('visual.color') ?? 'black'; }
 
     $vertex->setAttribute('graphviz.shape', $shape);
@@ -180,6 +186,7 @@ class VisualizeFlow
       'color' => $color,
       'fontsize' => 10,
       'shape' => $shape,
+      'style' => $style ?? 'solid',
 	  'fontname' => 'helvetica',
     ]);
 
@@ -235,7 +242,7 @@ class VisualizeFlow
     $edge->setAttribute('pvm.transition_id', $transition->getId());
 
     $edge->setAttribute('alom.graphviz', [
-      'label' => $transition->getName(),
+      //'label' => $transition->getName(),
       'id' => $transition->getId(),
 	  'fontname' => 'helvetica',
 	  'fontsize' => 10,
