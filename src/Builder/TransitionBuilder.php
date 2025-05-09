@@ -31,6 +31,12 @@ class TransitionBuilder
     }
   }
 
+  public function setDatabaseId(mixed $id): self
+{
+  $this->transition->setDatabaseId($id);
+  return $this;
+}
+
   public function setId(string $id): self
   {
     $oldId = get_value($this->transition, 'id');

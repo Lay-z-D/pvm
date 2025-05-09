@@ -153,40 +153,49 @@ class VisualizeFlow
 
 	switch ($node->getOption('type')) {  // original was "switch ($options->getType())"
 
-            case 'gateway':
-                $shape = 'diamond';
-				$color = 'black';
-                break;
-            case 'diagram':
-              $shape = 'doubleoctagon';
-              $color = 'orange';
-              $style = 'bold';
-              break;
-            case 'component':
-                $shape = 'component';
-                $color = 'orange';
-                break;
-            default:
-                $shape = 'box';
-                $style = 'solid';
-				$color = 'black';
-        }
+        case 'gateway':
+            $shape = 'diamond';
+            $color = '#a6a6a6';
+            $fillcolor = '#f0f0f0';
+            break;
+        case 'diagram':
+            $shape = 'doubleoctagon';
+            $color = 'orange';
+            $fillcolor = '#ffe396';
+            $style = 'bold';
+            break;
+        case 'component':
+            $shape = 'component';
+            $color = 'orange';
+            $fillcolor = '#f0f0f0';
+            break;
+        default:
+            $shape = 'box';
+            $fillcolor = '#f0f0f0';
+            $style = 'solid';
+            $color = '#a6a6a6';
+    }
 
-	if(!$color) { $color = $node->getConfig('visual.color') ?? 'black'; }
+        $style = 'rounded,filled';
+
+	if(!$color) { $color = $node->getConfig('visual.color') ?? '#a6a6a6'; }
 
     $vertex->setAttribute('graphviz.shape', $shape);
 
     $label = ($node->getLabel() ?: $node->getId());
     $tooltip = $node->getConfig('visual.tooltip') ?? $label;
+    $databaseId = $node->getOption('database_id'); 
 
     $vertex->setAttribute('alom.graphviz', [
-      'id' => $node->getId(),
+      'id' => $node->getId(), 
       'label' => new RawText('"' . $label . '"'),
       'tooltip' => $tooltip,
+      'URL' => "javascript:window.parent.Livewire.dispatch('initiateNodeEditInManager', { nodeId: " . $databaseId . " });", 
       'color' => $color,
       'fontsize' => 10,
       'shape' => $shape,
-      'style' => $style ?? 'solid',
+      'fillcolor' => $fillcolor,
+      'style' => $style,
 	  'fontname' => 'helvetica',
     ]);
 
@@ -224,6 +233,7 @@ class VisualizeFlow
       'id' => $transition->getId(),
 	  'fontname' => 'helvetica',
 	  'fontsize' => 10,
+	  'color' => '#808080',
     ]);
   }
 
@@ -246,6 +256,7 @@ class VisualizeFlow
       'id' => $transition->getId(),
 	  'fontname' => 'helvetica',
 	  'fontsize' => 10,
+	  'color' => '#808080',
     ]);
   }
 
@@ -265,8 +276,10 @@ class VisualizeFlow
     $edge->setAttribute('alom.graphviz', [
       'id' => $transition->getId(),
       'label' => $transition->getName(),
+      'URL' => "javascript:window.parent.Livewire.dispatch('initiateTransitionEditInManager', { transitionId: '" . $transition->getDatabaseId() . "' });",
 	  'fontname' => 'helvetica',
 	  'fontsize' => 10,
+      'color' => '#808080',
     ]);
   }
 
@@ -285,7 +298,9 @@ class VisualizeFlow
 
       $vertex->setAttribute('alom.graphviz', [
         'label' => 'Start',
-        'color' => 'blue',
+        'color' => '#2f65fa',
+        'fillcolor' => 'lightblue',
+        'style' => 'filled',
         'shape' => 'circle',
 		'fontname' => 'helvetica',
 		'fontsize' => 10,
@@ -310,7 +325,9 @@ class VisualizeFlow
 
       $vertex->setAttribute('alom.graphviz', [
         'label' => 'End',
-        'color' => 'red',
+        'color' => '#fa4141',
+        'fillcolor' => '#ff8c8c',
+        'style' => 'filled',
         'shape' => 'circle',
 		'fontname' => 'helvetica',
 		'fontsize' => 10,
@@ -327,13 +344,13 @@ class VisualizeFlow
         $transitionColor = 'red';
         break;
       case TokenTransition::STATE_PASSED:
-        $transitionColor = 'blue';
+        $transitionColor = '#2f65fa';
         break;
       case TokenTransition::STATE_WAITING:
         $transitionColor = 'orange';
         break;
       default:
-        $transitionColor = 'black';
+        $transitionColor = '#808080';
     }
 
     return $transitionColor;

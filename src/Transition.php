@@ -28,6 +28,16 @@ class Transition
     $this->setActive(true);
   }
 
+  public function setDatabaseId(mixed $databaseId): void
+  {
+      set_value($this, 'database_id', $databaseId);
+  }
+
+  public function getDatabaseId(): mixed
+  {
+      return get_value($this, 'database_id');
+  }
+
   public function setId(string $id): void
   {
     set_value($this, 'id', $id);
