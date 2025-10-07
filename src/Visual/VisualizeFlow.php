@@ -155,15 +155,39 @@ class VisualizeFlow
 
         case 'gateway':
             $shape = 'diamond';
-            $color = '#a6a6a6';
-            $fillcolor = '#f0f0f0';
+            $color = '#d4b102';
+            $fillcolor = '#fffabf';
             break;
         case 'diagram':
             $shape = 'doubleoctagon';
             $color = 'orange';
             $fillcolor = '#ffe396';
-            $style = 'bold';
             break;
+        case 'medication_decision':
+          $shape = 'box';
+          $color = 'purple';
+          $fillcolor = '#ddadff';
+          break;    
+        case 'notification':
+          $shape = 'box';
+          $color = '#56c7c4';
+          $fillcolor = '#bff2f1';
+          break;
+        case 'output_array':
+          $shape = 'box';
+          $color = '#57992b';
+          $fillcolor = '#bcff8f';
+          break;
+        case 'output':
+          $shape = 'box';
+          $color = '#57992b';
+          $fillcolor = '#bcff8f';
+          break;
+        case 'output_behaviour':
+          $shape = 'box';
+          $color = '#57992b';
+          $fillcolor = '#bcff8f';
+          break;
         case 'component':
             $shape = 'component';
             $color = 'orange';
@@ -276,9 +300,9 @@ class VisualizeFlow
     $edge->setAttribute('alom.graphviz', [
       'id' => $transition->getId(),
       'label' => $transition->getName(),
-      'URL' => "javascript:window.parent.Livewire.dispatch('initiateTransitionEditInManager', { transitionId: '" . $transition->getDatabaseId() . "' });",
-	  'fontname' => 'helvetica',
-	  'fontsize' => 10,
+      'URL' => "javascript:window.parent.Livewire.dispatch('initiateNodeEditInManager', { nodeId: '" . $transition->getDatabaseId() . "' });",
+      'fontname' => 'helvetica',
+	    'fontsize' => 10,
       'color' => '#808080',
     ]);
   }
