@@ -2,21 +2,62 @@
 
 namespace Formapro\Pvm\Visual;
 
-use Formapro\Pvm\Node;
-use Formapro\Pvm\Token;
-use Formapro\Pvm\Process;
+use Alom\Graphviz\RawText;
+use Fhaculty\Graph\Edge\Directed;
 use Fhaculty\Graph\Graph;
 use Fhaculty\Graph\Vertex;
-use Alom\Graphviz\RawText;
-use Formapro\Pvm\Transition;
-use Graphp\GraphViz\GraphViz;
-use Fhaculty\Graph\Edge\Directed;
+use Formapro\Pvm\Node;
+use Formapro\Pvm\Process;
+use Formapro\Pvm\Token;
 use Formapro\Pvm\TokenTransition;
+use Formapro\Pvm\Transition;
 use function Formapro\Values\get_value;
+use Illuminate\Support\Facades\DB;
 use function Formapro\Values\build_object;
+//use Graphp\GraphViz\GraphViz;
 
 class VisualizeFlow
 {
+  private static $styleCache = null;
+  
+  private function getNodeTypeStyles(): array
+  {
+    if (self::$styleCache === null) {
+      self::$styleCache = [];
+      
+      try {
+        $styles = DB::table('diagram_node_type_styles')->get();
+        foreach ($styles as $style) {
+          self::$styleCache[$style->type] = [
+            'shape' => $style->shape,
+            'color' => $style->color,
+            'fillcolor' => $style->fillcolor,
+            'style' => $style->style,
+          ];
+        }
+      } catch (\Exception $e) {
+        // If table doesn't exist yet, use defaults
+        self::$styleCache = $this->getDefaultStyles();
+      }
+    }
+    
+    return self::$styleCache;
+  }
+  
+  private function getDefaultStyles(): array
+  {
+    return [
+      'gateway' => ['shape' => 'diamond', 'color' => '#d4b102', 'fillcolor' => '#fffabf', 'style' => 'rounded,filled'],
+      'diagram' => ['shape' => 'doubleoctagon', 'color' => 'orange', 'fillcolor' => '#ffe396', 'style' => 'rounded,filled'],
+      'medication_decision' => ['shape' => 'box', 'color' => 'purple', 'fillcolor' => '#ddadff', 'style' => 'rounded,filled'],
+      'notification' => ['shape' => 'box', 'color' => '#56c7c4', 'fillcolor' => '#bff2f1', 'style' => 'rounded,filled'],
+      'output_array' => ['shape' => 'box', 'color' => '#57992b', 'fillcolor' => '#bcff8f', 'style' => 'rounded,filled'],
+      'output' => ['shape' => 'box', 'color' => '#57992b', 'fillcolor' => '#bcff8f', 'style' => 'rounded,filled'],
+      'output_behaviour' => ['shape' => 'box', 'color' => '#57992b', 'fillcolor' => '#bcff8f', 'style' => 'rounded,filled'],
+      'component' => ['shape' => 'component', 'color' => 'orange', 'fillcolor' => '#f0f0f0', 'style' => 'rounded,filled'],
+      'default' => ['shape' => 'box', 'color' => '#a6a6a6', 'fillcolor' => '#f0f0f0', 'style' => 'rounded,filled'],
+    ];
+  }
 
   public function createGraph(Process $process)
   {
@@ -73,8 +114,9 @@ class VisualizeFlow
    * @param Graph $graph
    * @param Process $process
    * @param Token[] $tokens
+   * @param bool $showExceptions Whether to color nodes red on exceptions (default: true)
    */
-  public function applyTokens(Graph $graph, Process $process, array $tokens = [])
+  public function applyTokens(Graph $graph, Process $process, array $tokens = [], bool $showExceptions = true)
   {
     $endVertex = $this->createEndVertex($graph);
 
@@ -98,7 +140,7 @@ class VisualizeFlow
         $edge->setAttribute('graphviz.color', $this->guessTransitionColor($tokenTransition));
         $alomEdgeAttributes['color'] = $this->guessTransitionColor($tokenTransition);
 
-        if ($hasException) {
+        if ($hasException && $showExceptions) {
           $edge->getVertexEnd()->setAttribute('graphviz.color', 'red');
 
           $vertexEndAlomAttributes = $edge->getVertexEnd()->getAttribute('alom.graphviz', []);
@@ -149,58 +191,15 @@ class VisualizeFlow
       $vertex->setAttribute('alom.graphviz_subgroup', $groupId);
     }
 
-    //$shape = $this->getNodeShape($options);
-
-	switch ($node->getOption('type')) {  // original was "switch ($options->getType())"
-
-        case 'gateway':
-            $shape = 'diamond';
-            $color = '#d4b102';
-            $fillcolor = '#fffabf';
-            break;
-        case 'diagram':
-            $shape = 'doubleoctagon';
-            $color = 'orange';
-            $fillcolor = '#ffe396';
-            break;
-        case 'medication_decision':
-          $shape = 'box';
-          $color = 'purple';
-          $fillcolor = '#ddadff';
-          break;    
-        case 'notification':
-          $shape = 'box';
-          $color = '#56c7c4';
-          $fillcolor = '#bff2f1';
-          break;
-        case 'output_array':
-          $shape = 'box';
-          $color = '#57992b';
-          $fillcolor = '#bcff8f';
-          break;
-        case 'output':
-          $shape = 'box';
-          $color = '#57992b';
-          $fillcolor = '#bcff8f';
-          break;
-        case 'output_behaviour':
-          $shape = 'box';
-          $color = '#57992b';
-          $fillcolor = '#bcff8f';
-          break;
-        case 'component':
-            $shape = 'component';
-            $color = 'orange';
-            $fillcolor = '#f0f0f0';
-            break;
-        default:
-            $shape = 'box';
-            $fillcolor = '#f0f0f0';
-            $style = 'solid';
-            $color = '#a6a6a6';
-    }
-
-        $style = 'rounded,filled';
+    // Get styles from database or defaults
+    $styles = $this->getNodeTypeStyles();
+    $nodeType = $node->getOption('type') ?? 'default';
+    $styleConfig = $styles[$nodeType] ?? $styles['default'];
+    
+    $shape = $styleConfig['shape'];
+    $color = $styleConfig['color'];
+    $fillcolor = $styleConfig['fillcolor'];
+    $style = $styleConfig['style'];
 
 	if(!$color) { $color = $node->getConfig('visual.color') ?? '#a6a6a6'; }
 
