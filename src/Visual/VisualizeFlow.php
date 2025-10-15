@@ -272,8 +272,8 @@ class VisualizeFlow
     }
 
     $edge->setAttribute('graphviz.label', $transition->getName());
-    $edge->setAttribute('graphviz.id', $transition->getId());
-    $edge->setAttribute('pvm.transition_id', $transition->getId());
+    $edge->setAttribute('graphviz.id', $transition->getId() . '_end');
+    $edge->setAttribute('pvm.transition_id', $transition->getId() . '_end');
 
     $edge->setAttribute('alom.graphviz', [
       //'label' => $transition->getName(),
