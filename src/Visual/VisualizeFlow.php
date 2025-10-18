@@ -22,6 +22,7 @@ class VisualizeFlow
   private static $graphSettingsCache = null;
   private static $transitionStyleCache = null;
   private static $specialNodesCache = null;
+  private $colorMode = 'light';
   
   private function getNodeTypeStyles(): array
   {
@@ -63,6 +64,9 @@ class VisualizeFlow
             'fontname' => $settings->fontname,
             'fontsize' => $settings->fontsize,
             'fontcolor' => $settings->fontcolor,
+            'bgcolor_light' => $settings->bgcolor_light ?? 'transparent',
+            'bgcolor_dark' => $settings->bgcolor_dark ?? 'transparent',
+            'splines' => $settings->splines ?? 'curved',
           ];
         } else {
           self::$graphSettingsCache = $this->getDefaultGraphSettings();
@@ -85,7 +89,8 @@ class VisualizeFlow
             'color' => $style->color,
             'fontname' => $style->fontname,
             'fontsize' => $style->fontsize,
-            'fontcolor' => $style->fontcolor,
+            'fontcolor_light' => $style->fontcolor_light ?? '#000000',
+            'fontcolor_dark' => $style->fontcolor_dark ?? '#FFFFFF',
             'style' => $style->style,
             'penwidth' => $style->penwidth,
           ];
@@ -155,6 +160,9 @@ class VisualizeFlow
       'fontname' => 'helvetica',
       'fontsize' => 10,
       'fontcolor' => '#000000',
+      'bgcolor_light' => 'transparent',
+      'bgcolor_dark' => 'transparent',
+      'splines' => 'curved',
     ];
   }
   
@@ -164,7 +172,8 @@ class VisualizeFlow
       'color' => '#808080',
       'fontname' => 'helvetica',
       'fontsize' => 10,
-      'fontcolor' => '#000000',
+      'fontcolor_light' => '#000000',
+      'fontcolor_dark' => '#FFFFFF',
       'style' => 'solid',
       'penwidth' => 1,
     ];
@@ -196,21 +205,29 @@ class VisualizeFlow
       ];
     }
   }
-
-  public function createGraph(Process $process)
+  
+  public function createGraph(Process $process, $color = 'light')
   {
+    // Store color mode for use in transition methods
+    $this->colorMode = $color;
+    
     $graphSettings = $this->getGraphSettings();
+    
+    // Select appropriate bgcolor based on color mode
+    $bgcolor = $color === 'dark' ? 'bgcolor_dark' : 'bgcolor_light';
     
     $graph = new Graph();
     $graph->setAttribute('graphviz.graph.rankdir', $graphSettings['rankdir']);
     $graph->setAttribute('graphviz.graph.ranksep', $graphSettings['ranksep']);
-//        $graph->setAttribute('graphviz.graph.constraint', false);
-//        $graph->setAttribute('graphviz.graph.splines', 'ortho');
+    $graph->setAttribute('graphviz.graph.bgcolor', $graphSettings[$bgcolor]);
+    $graph->setAttribute('graphviz.graph.splines', $graphSettings['splines']);
     $graph->setAttribute('alom.graphviz', [
-      'rankdir' => $graphSettings['rankdir'],
-      'ranksep' => $graphSettings['ranksep'],
+    'rankdir' => $graphSettings['rankdir'],
+    'ranksep' => $graphSettings['ranksep'],
 	  'size' => $graphSettings['size'],
 	  'fontname' => $graphSettings['fontname'],
+	  'bgcolor' => $graphSettings[$bgcolor],
+	  'splines' => $graphSettings['splines'],
     ]);
 
     $startVertex = $this->createStartVertex($graph);
@@ -389,6 +406,7 @@ class VisualizeFlow
   private function createStartTransition(Graph $graph, Vertex $from, Transition $transition)
   {
     $transitionStyle = $this->getTransitionStyle();
+    $fontcolor = $this->colorMode === 'dark' ? $transitionStyle['fontcolor_dark'] : $transitionStyle['fontcolor_light'];
     $to = $graph->getVertex($transition->getTo()->getId());
 
     $edge = $from->createEdgeTo($to);
@@ -401,7 +419,7 @@ class VisualizeFlow
       'id' => $transition->getId(),
 	  'fontname' => $transitionStyle['fontname'],
 	  'fontsize' => $transitionStyle['fontsize'],
-	  'fontcolor' => $transitionStyle['fontcolor'],
+	  'fontcolor' => $fontcolor,
 	  'color' => $transitionStyle['color'],
 	  'style' => $transitionStyle['style'],
 	  'penwidth' => $transitionStyle['penwidth'],
@@ -411,6 +429,7 @@ class VisualizeFlow
   private function createEndTransition(Graph $graph, Vertex $to, Transition $transition)
   {
     $transitionStyle = $this->getTransitionStyle();
+    $fontcolor = $this->colorMode === 'dark' ? $transitionStyle['fontcolor_dark'] : $transitionStyle['fontcolor_light'];
     $from = $graph->getVertex($transition->getTo()->getId());
 
     if ($from->hasEdgeTo($to)) {
@@ -428,7 +447,7 @@ class VisualizeFlow
       'id' => $transition->getId() . '_end',
 	  'fontname' => $transitionStyle['fontname'],
 	  'fontsize' => $transitionStyle['fontsize'],
-	  'fontcolor' => $transitionStyle['fontcolor'],
+	  'fontcolor' => $fontcolor,
 	  'color' => $transitionStyle['color'],
 	  'style' => $transitionStyle['style'],
 	  'penwidth' => $transitionStyle['penwidth'],
@@ -438,6 +457,7 @@ class VisualizeFlow
   private function createMiddleTransition(Graph $graph, Transition $transition)
   {
     $transitionStyle = $this->getTransitionStyle();
+    $fontcolor = $this->colorMode === 'dark' ? $transitionStyle['fontcolor_dark'] : $transitionStyle['fontcolor_light'];
     $from = $graph->getVertex($transition->getFrom()->getId());
     $to = $graph->getVertex($transition->getTo()->getId());
 
@@ -455,7 +475,7 @@ class VisualizeFlow
       'URL' => "javascript:window.parent.Livewire.dispatch('initiateNodeEditInManager', { nodeId: '" . $transition->getDatabaseId() . "' });",
       'fontname' => $transitionStyle['fontname'],
 	    'fontsize' => $transitionStyle['fontsize'],
-	    'fontcolor' => $transitionStyle['fontcolor'],
+	    'fontcolor' => $fontcolor,
       'color' => $transitionStyle['color'],
       'style' => $transitionStyle['style'],
       'penwidth' => $transitionStyle['penwidth'],
