@@ -32,14 +32,22 @@ class VisualizeFlow
       try {
         $styles = DB::table('diagram_node_type_styles')->get();
         foreach ($styles as $style) {
+          // Select colors based on color mode
+          $color = $this->colorMode === 'dark' ? ($style->color_dark ?? $style->color_light) : $style->color_light;
+          $fillcolor = $this->colorMode === 'dark' ? ($style->fillcolor_dark ?? $style->fillcolor_light) : $style->fillcolor_light;
+          $fontcolor = $this->colorMode === 'dark' ? ($style->fontcolor_dark ?? $style->fontcolor_light) : $style->fontcolor_light;
+          $fillcolor_gradient = $this->colorMode === 'dark' ? ($style->fillcolor_gradient_dark ?? null) : ($style->fillcolor_gradient_light ?? null);
+          
           self::$styleCache[$style->type] = [
             'shape' => $style->shape,
-            'color' => $style->color,
-            'fillcolor' => $style->fillcolor,
+            'color' => $color,
+            'fillcolor' => $fillcolor_gradient ?? $fillcolor,
             'style' => $style->style,
+            'gradientangle' => $style->gradientangle ?? 0,
+            'penwidth' => $style->penwidth ?? 1.0,
             'fontname' => $style->fontname ?? 'helvetica',
             'fontsize' => $style->fontsize ?? 10,
-            'fontcolor' => $style->fontcolor ?? '#000000',
+            'fontcolor' => $fontcolor,
           ];
         }
       } catch (\Exception $e) {
@@ -63,9 +71,11 @@ class VisualizeFlow
             'size' => $settings->size,
             'fontname' => $settings->fontname,
             'fontsize' => $settings->fontsize,
-            'fontcolor' => $settings->fontcolor,
             'bgcolor_light' => $settings->bgcolor_light ?? 'transparent',
             'bgcolor_dark' => $settings->bgcolor_dark ?? 'transparent',
+            'bgcolor_gradient_light' => $settings->bgcolor_gradient_light ?? null,
+            'bgcolor_gradient_dark' => $settings->bgcolor_gradient_dark ?? null,
+            'graph_style' => $settings->graph_style ?? null,
             'splines' => $settings->splines ?? 'curved',
           ];
         } else {
@@ -86,13 +96,18 @@ class VisualizeFlow
         $style = DB::table('diagram_transition_styles')->where('name', 'default')->first();
         if ($style) {
           self::$transitionStyleCache = [
-            'color' => $style->color,
+            'color_light' => $style->color_light ?? '#808080',
+            'color_dark' => $style->color_dark ?? '#b0b0b0',
             'fontname' => $style->fontname,
             'fontsize' => $style->fontsize,
             'fontcolor_light' => $style->fontcolor_light ?? '#000000',
             'fontcolor_dark' => $style->fontcolor_dark ?? '#FFFFFF',
             'style' => $style->style,
             'penwidth' => $style->penwidth,
+            'arrowsize' => $style->arrowsize ?? 1.0,
+            'taken_style' => $style->taken_style ?? 'solid',
+            'taken_color_light' => $style->taken_color_light ?? '#2f65fa',
+            'taken_color_dark' => $style->taken_color_dark ?? '#5a8dff',
           ];
         } else {
           self::$transitionStyleCache = $this->getDefaultTransitionStyle();
@@ -115,15 +130,23 @@ class VisualizeFlow
       try {
         $style = DB::table('diagram_special_node_styles')->where('node_type', $nodeType)->first();
         if ($style) {
+          // Select colors based on color mode
+          $color = $this->colorMode === 'dark' ? ($style->color_dark ?? $style->color_light) : $style->color_light;
+          $fillcolor = $this->colorMode === 'dark' ? ($style->fillcolor_dark ?? $style->fillcolor_light) : $style->fillcolor_light;
+          $fontcolor = $this->colorMode === 'dark' ? ($style->fontcolor_dark ?? $style->fontcolor_light) : $style->fontcolor_light;
+          $fillcolor_gradient = $this->colorMode === 'dark' ? ($style->fillcolor_gradient_dark ?? null) : ($style->fillcolor_gradient_light ?? null);
+          
           self::$specialNodesCache[$nodeType] = [
             'label' => $style->label,
             'shape' => $style->shape,
-            'color' => $style->color,
-            'fillcolor' => $style->fillcolor,
+            'color' => $color,
+            'fillcolor' => $fillcolor_gradient ?? $fillcolor,
             'style' => $style->style,
+            'gradientangle' => $style->gradientangle ?? 0,
+            'penwidth' => $style->penwidth ?? 1.0,
             'fontname' => $style->fontname,
             'fontsize' => $style->fontsize,
-            'fontcolor' => $style->fontcolor,
+            'fontcolor' => $fontcolor,
           ];
         } else {
           self::$specialNodesCache[$nodeType] = $this->getDefaultSpecialNodeStyle($nodeType);
@@ -159,9 +182,11 @@ class VisualizeFlow
       'size' => '10,100',
       'fontname' => 'helvetica',
       'fontsize' => 10,
-      'fontcolor' => '#000000',
       'bgcolor_light' => 'transparent',
       'bgcolor_dark' => 'transparent',
+      'bgcolor_gradient_light' => null,
+      'bgcolor_gradient_dark' => null,
+      'graph_style' => null,
       'splines' => 'curved',
     ];
   }
@@ -169,13 +194,18 @@ class VisualizeFlow
   private function getDefaultTransitionStyle(): array
   {
     return [
-      'color' => '#808080',
+      'color_light' => '#808080',
+      'color_dark' => '#b0b0b0',
       'fontname' => 'helvetica',
       'fontsize' => 10,
       'fontcolor_light' => '#000000',
       'fontcolor_dark' => '#FFFFFF',
       'style' => 'solid',
       'penwidth' => 1,
+      'arrowsize' => 1.0,
+      'taken_style' => 'solid',
+      'taken_color_light' => '#2f65fa',
+      'taken_color_dark' => '#5a8dff',
     ];
   }
   
@@ -211,23 +241,44 @@ class VisualizeFlow
     // Store color mode for use in transition methods
     $this->colorMode = $color;
     
+    // Clear caches to ensure colors are loaded with correct mode
+    self::$styleCache = null;
+    self::$specialNodesCache = null;
+    
     $graphSettings = $this->getGraphSettings();
     
-    // Select appropriate bgcolor based on color mode
-    $bgcolor = $color === 'dark' ? 'bgcolor_dark' : 'bgcolor_light';
+    // Select appropriate bgcolor and gradient based on color mode
+    $bgcolor_key = $color === 'dark' ? 'bgcolor_dark' : 'bgcolor_light';
+    $gradient_key = $color === 'dark' ? 'bgcolor_gradient_dark' : 'bgcolor_gradient_light';
+    
+    // Use gradient if available, otherwise use solid color
+    $bgcolor = $graphSettings[$gradient_key] ?? $graphSettings[$bgcolor_key];
+    
+    // Reverse gradient direction (swap colors in gradient string)
+    if (strpos($bgcolor, ':') !== false) {
+      $colors = explode(':', $bgcolor);
+      $bgcolor = $colors[1] . ':' . $colors[0];
+    }
+    
+    $graphStyle = $graphSettings['graph_style'];
     
     $graph = new Graph();
     $graph->setAttribute('graphviz.graph.rankdir', $graphSettings['rankdir']);
     $graph->setAttribute('graphviz.graph.ranksep', $graphSettings['ranksep']);
-    $graph->setAttribute('graphviz.graph.bgcolor', $graphSettings[$bgcolor]);
+    $graph->setAttribute('graphviz.graph.bgcolor', $bgcolor);
     $graph->setAttribute('graphviz.graph.splines', $graphSettings['splines']);
+    if ($graphStyle) {
+      $graph->setAttribute('graphviz.graph.style', $graphStyle);
+    }
     $graph->setAttribute('alom.graphviz', [
     'rankdir' => $graphSettings['rankdir'],
     'ranksep' => $graphSettings['ranksep'],
 	  'size' => $graphSettings['size'],
 	  'fontname' => $graphSettings['fontname'],
-	  'bgcolor' => $graphSettings[$bgcolor],
+	  'bgcolor' => $bgcolor,
 	  'splines' => $graphSettings['splines'],
+	  'style' => $graphStyle ?: null,
+    'pad' => '0.20',
     ]);
 
     $startVertex = $this->createStartVertex($graph);
@@ -377,8 +428,10 @@ class VisualizeFlow
       'color' => $color,
       'fontsize' => $fontsize,
       'shape' => $shape,
-      'fillcolor' => $fillcolor,
+      'fillcolor' => $styleConfig['fillcolor'],
       'style' => $style,
+      'gradientangle' => $styleConfig['gradientangle'] ?? 0,
+      'penwidth' => $styleConfig['penwidth'] ?? 1.0,
 	  'fontname' => $fontname,
 	  'fontcolor' => $fontcolor,
     ]);
@@ -407,6 +460,7 @@ class VisualizeFlow
   {
     $transitionStyle = $this->getTransitionStyle();
     $fontcolor = $this->colorMode === 'dark' ? $transitionStyle['fontcolor_dark'] : $transitionStyle['fontcolor_light'];
+    $color = $this->colorMode === 'dark' ? $transitionStyle['color_dark'] : $transitionStyle['color_light'];
     $to = $graph->getVertex($transition->getTo()->getId());
 
     $edge = $from->createEdgeTo($to);
@@ -420,9 +474,10 @@ class VisualizeFlow
 	  'fontname' => $transitionStyle['fontname'],
 	  'fontsize' => $transitionStyle['fontsize'],
 	  'fontcolor' => $fontcolor,
-	  'color' => $transitionStyle['color'],
+	  'color' => $color,
 	  'style' => $transitionStyle['style'],
 	  'penwidth' => $transitionStyle['penwidth'],
+	  'arrowsize' => $transitionStyle['arrowsize'] ?? 1.0,
     ]);
   }
 
@@ -430,6 +485,7 @@ class VisualizeFlow
   {
     $transitionStyle = $this->getTransitionStyle();
     $fontcolor = $this->colorMode === 'dark' ? $transitionStyle['fontcolor_dark'] : $transitionStyle['fontcolor_light'];
+    $color = $this->colorMode === 'dark' ? $transitionStyle['color_dark'] : $transitionStyle['color_light'];
     $from = $graph->getVertex($transition->getTo()->getId());
 
     if ($from->hasEdgeTo($to)) {
@@ -448,9 +504,10 @@ class VisualizeFlow
 	  'fontname' => $transitionStyle['fontname'],
 	  'fontsize' => $transitionStyle['fontsize'],
 	  'fontcolor' => $fontcolor,
-	  'color' => $transitionStyle['color'],
+	  'color' => $color,
 	  'style' => $transitionStyle['style'],
 	  'penwidth' => $transitionStyle['penwidth'],
+	  'arrowsize' => $transitionStyle['arrowsize'] ?? 1.0,
     ]);
   }
 
@@ -458,6 +515,7 @@ class VisualizeFlow
   {
     $transitionStyle = $this->getTransitionStyle();
     $fontcolor = $this->colorMode === 'dark' ? $transitionStyle['fontcolor_dark'] : $transitionStyle['fontcolor_light'];
+    $color = $this->colorMode === 'dark' ? $transitionStyle['color_dark'] : $transitionStyle['color_light'];
     $from = $graph->getVertex($transition->getFrom()->getId());
     $to = $graph->getVertex($transition->getTo()->getId());
 
@@ -476,9 +534,10 @@ class VisualizeFlow
       'fontname' => $transitionStyle['fontname'],
 	    'fontsize' => $transitionStyle['fontsize'],
 	    'fontcolor' => $fontcolor,
-      'color' => $transitionStyle['color'],
+      'color' => $color,
       'style' => $transitionStyle['style'],
       'penwidth' => $transitionStyle['penwidth'],
+      'arrowsize' => $transitionStyle['arrowsize'] ?? 1.0,
     ]);
   }
 
@@ -502,6 +561,8 @@ class VisualizeFlow
         'color' => $style['color'],
         'fillcolor' => $style['fillcolor'],
         'style' => $style['style'],
+        'gradientangle' => $style['gradientangle'] ?? 0,
+        'penwidth' => $style['penwidth'] ?? 1.0,
         'shape' => $style['shape'],
 		'fontname' => $style['fontname'],
 		'fontsize' => $style['fontsize'],
@@ -532,6 +593,8 @@ class VisualizeFlow
         'color' => $style['color'],
         'fillcolor' => $style['fillcolor'],
         'style' => $style['style'],
+        'gradientangle' => $style['gradientangle'] ?? 0,
+        'penwidth' => $style['penwidth'] ?? 1.0,
         'shape' => $style['shape'],
 		'fontname' => $style['fontname'],
 		'fontsize' => $style['fontsize'],
